@@ -110,12 +110,12 @@ class BVolumeWidget(QWidget):
         layout.setSpacing(6)
 
         self.slider = QSlider(Qt.Orientation.Horizontal)
-        self.slider.setRange(0, 100)
+        self.slider.setRange(0, 200)
         self.slider.setValue(int(initial_vol * 100))
         layout.addWidget(self.slider, stretch=1)
 
         self.spin = QDoubleSpinBox()
-        self.spin.setRange(0.00, 1.00)
+        self.spin.setRange(0.00, 2.00)
         self.spin.setSingleStep(0.05)
         self.spin.setDecimals(2)
         self.spin.setFixedWidth(55)
@@ -1088,12 +1088,17 @@ class ReadingVideoApp(QMainWindow):
         self.media_player.stop() # 試聴停止
         self.subtitle_timer.stop() # 切り替え時にタイマーをキャンセル
         
-        # 背景テーブルの選択をクリア (音声側プレビューをアサート)
+        # 背景テーブル・BGMテーブルの選択をクリア (音声側プレビューをアサート)
         if hasattr(self, "bg_table"):
             self.bg_table.blockSignals(True)
             self.bg_table.clearSelection()
             self.bg_table.setCurrentItem(None)
             self.bg_table.blockSignals(False)
+        if hasattr(self, "bgm_table"):
+            self.bgm_table.blockSignals(True)
+            self.bgm_table.clearSelection()
+            self.bgm_table.setCurrentItem(None)
+            self.bgm_table.blockSignals(False)
             
         items = self.clip_list.selectedItems()
         if not items:
