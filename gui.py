@@ -30,7 +30,7 @@ class PreviewWidget(QWidget):
         self.text = "クリップが選択されていません"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumSize(160, 90)
-        
+
     def set_pixmap(self, pixmap):
         self.pixmap = pixmap
         self.text = ""
@@ -44,21 +44,21 @@ class PreviewWidget(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.fillRect(self.rect(), Qt.GlobalColor.black)
-        
+
         if self.pixmap and not self.pixmap.isNull():
             w = self.width()
             h = self.height()
-            
+
             if w / 16.0 > h / 9.0:
                 new_h = h
                 new_w = int(new_h * 16 / 9)
             else:
                 new_w = w
                 new_h = int(new_w * 9 / 16)
-                
+
             x = (w - new_w) // 2
             y = (h - new_h) // 2
-            
+
             scaled_pixmap = self.pixmap.scaled(
                 new_w, new_h,
                 Qt.AspectRatioMode.KeepAspectRatio,
@@ -68,33 +68,36 @@ class PreviewWidget(QWidget):
         elif self.text:
             painter.setPen(Qt.GlobalColor.gray)
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.text)
-            
+
         painter.setPen(Qt.GlobalColor.darkGray)
         painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
 
 class ClipRowWidget(QWidget):
     def __init__(self, index, name, duration, enabled=True, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setStyleSheet("background: transparent;")
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 2, 5, 2)
         layout.setSpacing(10)
-        
+
         self.lbl_idx = QLabel(f"[{index}]")
         self.lbl_idx.setFixedWidth(45)
-        self.lbl_idx.setStyleSheet("font-weight: bold; color: #88ff88;")
+        self.lbl_idx.setStyleSheet("font-weight: bold; color: #88ff88; background: transparent;")
         layout.addWidget(self.lbl_idx)
-        
+
         self.lbl_name = QLabel(name)
         if not enabled:
-            self.lbl_name.setStyleSheet("text-decoration: line-through; color: #666666;")
+            self.lbl_name.setStyleSheet("text-decoration: line-through; color: #666666; background: transparent;")
         else:
-            self.lbl_name.setStyleSheet("color: #ffffff;")
+            self.lbl_name.setStyleSheet("color: #ffffff; background: transparent;")
         layout.addWidget(self.lbl_name, stretch=1)
-        
+
         self.lbl_dur = QLabel(f"{duration:.2f}s")
         self.lbl_dur.setFixedWidth(60)
         self.lbl_dur.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.lbl_dur.setStyleSheet("color: #a0a0a0;")
+        self.lbl_dur.setStyleSheet("color: #a0a0a0; background: transparent;")
         layout.addWidget(self.lbl_dur)
 
 class BVolumeWidget(QWidget):
@@ -102,25 +105,37 @@ class BVolumeWidget(QWidget):
     def __init__(self, initial_vol, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
-        
+
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setRange(0, 100)
         self.slider.setValue(int(initial_vol * 100))
-        self.slider.setFixedWidth(70)
-        layout.addWidget(self.slider)
-        
-        self.label = QLabel(f"{initial_vol:.2f}")
-        self.label.setFixedWidth(30)
-        layout.addWidget(self.label)
-        
-        self.slider.valueChanged.connect(self.on_value_changed)
-        
-    def on_value_changed(self, val):
+        layout.addWidget(self.slider, stretch=1)
+
+        self.spin = QDoubleSpinBox()
+        self.spin.setRange(0.00, 1.00)
+        self.spin.setSingleStep(0.05)
+        self.spin.setDecimals(2)
+        self.spin.setFixedWidth(55)
+        self.spin.setValue(initial_vol)
+        layout.addWidget(self.spin)
+
+        self.slider.valueChanged.connect(self.on_slider_changed)
+        self.spin.valueChanged.connect(self.on_spin_changed)
+
+    def on_slider_changed(self, val):
         vol = val / 100.0
-        self.label.setText(f"{vol:.2f}")
+        self.spin.blockSignals(True)
+        self.spin.setValue(vol)
+        self.spin.blockSignals(False)
         self.valueChanged.emit(vol)
+
+    def on_spin_changed(self, val):
+        self.slider.blockSignals(True)
+        self.slider.setValue(int(val * 100))
+        self.slider.blockSignals(False)
+        self.valueChanged.emit(val)
 
 class DragDropListWidget(QListWidget):
     order_changed = Signal()
@@ -155,17 +170,17 @@ class ReadingVideoApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("朗読動画作成アプリ")
         self.resize(1280, 950)
-        
+
         self.project = None
         self.selected_clip_id = None
         self.is_generating = False
-        
+
         self.thread = None
         self.worker = None
-        
+
         self.apply_dark_theme()
         self.build_ui()
-        
+
         temp_dir = os.path.abspath(os.path.join(os.getcwd(), "untitled_project"))
         self.project = core.Project(temp_dir)
         self.update_project_ui()
@@ -259,6 +274,18 @@ class ReadingVideoApp(QMainWindow):
                 border-radius: 4px;
                 gridline-color: #404040;
             }
+            QListWidget::item:selected {
+                background-color: #2a5a2a;
+                color: #ffffff;
+            }
+            QListWidget::item:selected:active {
+                background-color: #2a5a2a;
+                color: #ffffff;
+            }
+            QListWidget::item:selected:!active {
+                background-color: #2a5a2a;
+                color: #ffffff;
+            }
             QHeaderView::section {
                 background-color: #252525;
                 color: #ffffff;
@@ -319,96 +346,107 @@ class ReadingVideoApp(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
-        
+
         # 1. 最上部: 操作バー
         top_bar = QHBoxLayout()
         main_layout.addLayout(top_bar)
-        
+
         btn_open = QPushButton("📁 プロジェクトを開く")
         btn_open.clicked.connect(self.open_project)
         top_bar.addWidget(btn_open)
-        
+
         btn_new = QPushButton("➕ 新規プロジェクト")
         btn_new.clicked.connect(self.new_project)
         top_bar.addWidget(btn_new)
-        
+
         btn_save = QPushButton("💾 プロジェクト保存")
         btn_save.clicked.connect(self.save_project)
         top_bar.addWidget(btn_save)
-        
+
         btn_clean = QPushButton("🧹 未使用ファイルを整理")
         btn_clean.clicked.connect(self.clean_unused_files)
         top_bar.addWidget(btn_clean)
-        
+
         self.project_label = QLabel("プロジェクト: 未設定")
         self.project_label.setStyleSheet("font-style: italic; color: #a0a0a0; margin-left: 10px;")
         top_bar.addWidget(self.project_label)
         top_bar.addStretch()
-        
+
         # 2. 中部領域: QSplitterによる分割
         splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout.addWidget(splitter, stretch=1)
-        
+
         # 左ペイン: クリップリスト
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         group_clips = QGroupBox(" 音声クリップ一覧 ")
         group_clips_layout = QVBoxLayout(group_clips)
-        
+
         clip_btn_bar = QHBoxLayout()
         group_clips_layout.addLayout(clip_btn_bar)
-        
+
         btn_add_clip = QPushButton("➕ 音声追加")
         btn_add_clip.clicked.connect(self.add_audio_clips)
         clip_btn_bar.addWidget(btn_add_clip)
-        
+
         btn_del_clip = QPushButton("❌ 削除")
         btn_del_clip.clicked.connect(self.remove_selected_clip)
         clip_btn_bar.addWidget(btn_del_clip)
         clip_btn_bar.addStretch()
-        
+
         self.clip_list = DragDropListWidget()
         self.clip_list.order_changed.connect(self.on_clips_reordered)
         self.clip_list.itemSelectionChanged.connect(self.on_clip_selected)
         self.clip_list.itemDoubleClicked.connect(self.on_clip_double_clicked)
         group_clips_layout.addWidget(self.clip_list)
-        
+
         left_layout.addWidget(group_clips)
-        splitter.addWidget(left_widget)
-        
+
         # 中央ペイン: プレビュー
         center_widget = QWidget()
         center_layout = QVBoxLayout(center_widget)
         center_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         group_preview = QGroupBox(" プレビュー ")
         group_preview_layout = QVBoxLayout(group_preview)
-        
+
         self.preview_widget = PreviewWidget()
         group_preview_layout.addWidget(self.preview_widget)
-        
         center_layout.addWidget(group_preview)
-        splitter.addWidget(center_widget)
-        
+
         # 右ペイン: クリップ詳細 & 全体スタイル
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        
+
+        # splitter への追加順を変更 (プレビューを左、リストを中央、詳細は右)
+        splitter.addWidget(center_widget) # インデックス0: 左
+        splitter.addWidget(left_widget)   # インデックス1: 中央
+        splitter.addWidget(right_widget)  # インデックス2: 右
+
         group_detail = QGroupBox(" クリップ詳細・字幕編集 ")
         group_detail_layout = QVBoxLayout(group_detail)
-        
+
+        # 有効チェックボックスを最上部に配置
+        chk_row = QHBoxLayout()
+        group_detail_layout.addLayout(chk_row)
+        self.clip_enabled_chk = QCheckBox("このクリップを動画に含める（有効化）")
+        self.clip_enabled_chk.setChecked(True)
+        self.clip_enabled_chk.stateChanged.connect(self.on_clip_enabled_changed)
+        chk_row.addWidget(self.clip_enabled_chk)
+        chk_row.addStretch()
+
         group_detail_layout.addWidget(QLabel("字幕テキスト:"))
         self.subtitle_text = QTextEdit()
         self.subtitle_text.textChanged.connect(self.on_subtitle_changed)
         group_detail_layout.addWidget(self.subtitle_text)
-        
-        # 個別無音時間・音量スライダー・有効/無効
+
+        # 個別無音時間・音量スライダー (グリッドレイアウト)
         grid_opts = QGridLayout()
         group_detail_layout.addLayout(grid_opts)
-        
+
         grid_opts.addWidget(QLabel("個別待ち時間:"), 0, 0)
         self.clip_gap_spin = QDoubleSpinBox()
         self.clip_gap_spin.setRange(0.0, 60.0)
@@ -416,7 +454,7 @@ class ReadingVideoApp(QMainWindow):
         self.clip_gap_spin.setSuffix("s")
         self.clip_gap_spin.valueChanged.connect(self.on_clip_gap_changed)
         grid_opts.addWidget(self.clip_gap_spin, 0, 1)
-        
+
         grid_opts.addWidget(QLabel("個別音量:"), 1, 0)
         vol_lay = QHBoxLayout()
         self.clip_vol_scale = QSlider(Qt.Orientation.Horizontal)
@@ -424,18 +462,17 @@ class ReadingVideoApp(QMainWindow):
         self.clip_vol_scale.setValue(100)
         self.clip_vol_scale.valueChanged.connect(self.on_clip_vol_changed)
         vol_lay.addWidget(self.clip_vol_scale)
-        self.lbl_clip_vol_val = QLabel("1.00")
-        self.lbl_clip_vol_val.setFixedWidth(30)
-        vol_lay.addWidget(self.lbl_clip_vol_val)
+        self.clip_vol_spin = QDoubleSpinBox()
+        self.clip_vol_spin.setRange(0.00, 2.00)
+        self.clip_vol_spin.setSingleStep(0.05)
+        self.clip_vol_spin.setDecimals(2)
+        self.clip_vol_spin.setFixedWidth(60)
+        self.clip_vol_spin.valueChanged.connect(self.on_clip_vol_spin_changed)
+        vol_lay.addWidget(self.clip_vol_spin)
         grid_opts.addLayout(vol_lay, 1, 1)
-        
-        self.clip_enabled_chk = QCheckBox("有効")
-        self.clip_enabled_chk.setChecked(True)
-        self.clip_enabled_chk.stateChanged.connect(self.on_clip_enabled_changed)
-        grid_opts.addWidget(self.clip_enabled_chk, 0, 2)
-        
+
         right_layout.addWidget(group_detail, stretch=2)
-        
+
         # 基本待ち時間設定（追加）
         group_gap_config = QGroupBox(" 基本待ち時間設定 ")
         group_gap_layout = QHBoxLayout(group_gap_config)
@@ -448,35 +485,35 @@ class ReadingVideoApp(QMainWindow):
         group_gap_layout.addWidget(self.default_gap_spin)
         group_gap_layout.addStretch()
         right_layout.addWidget(group_gap_config)
-        
+
         # 字幕スタイル設定
         group_style = QGroupBox(" 字幕スタイル（全体） ")
         group_style_grid = QGridLayout(group_style)
-        
+
         group_style_grid.addWidget(QLabel("フォントサイズ:"), 0, 0)
         self.font_size_spin = QSpinBox()
         self.font_size_spin.setRange(20, 150)
         self.font_size_spin.setValue(58)
         self.font_size_spin.valueChanged.connect(self.on_style_changed)
         group_style_grid.addWidget(self.font_size_spin, 0, 1)
-        
+
         group_style_grid.addWidget(QLabel("表示位置:"), 0, 2)
         self.pos_combo = QComboBox()
         self.pos_combo.addItems(["top", "center", "bottom"])
         self.pos_combo.setCurrentText("bottom")
         self.pos_combo.currentTextChanged.connect(self.on_style_changed)
         group_style_grid.addWidget(self.pos_combo, 0, 3)
-        
+
         group_style_grid.addWidget(QLabel("文字色:"), 1, 0)
         self.text_color_ent = QLineEdit("#EEF1F8")
         self.text_color_ent.textChanged.connect(self.on_style_changed)
         group_style_grid.addWidget(self.text_color_ent, 1, 1)
-        
+
         group_style_grid.addWidget(QLabel("背景ボックス色:"), 1, 2)
         self.box_color_ent = QLineEdit("#000000")
         self.box_color_ent.textChanged.connect(self.on_style_changed)
         group_style_grid.addWidget(self.box_color_ent, 1, 3)
-        
+
         group_style_grid.addWidget(QLabel("不透明度:"), 2, 0)
         self.box_opacity_spin = QDoubleSpinBox()
         self.box_opacity_spin.setRange(0.0, 1.0)
@@ -484,29 +521,29 @@ class ReadingVideoApp(QMainWindow):
         self.box_opacity_spin.setValue(0.5)
         self.box_opacity_spin.valueChanged.connect(self.on_style_changed)
         group_style_grid.addWidget(self.box_opacity_spin, 2, 1)
-        
+
         group_style_grid.addWidget(QLabel("下マージン:"), 2, 2)
         self.margin_spin = QSpinBox()
         self.margin_spin.setRange(10, 300)
         self.margin_spin.setValue(95)
         self.margin_spin.valueChanged.connect(self.on_style_changed)
         group_style_grid.addWidget(self.margin_spin, 2, 3)
-        
+
         right_layout.addWidget(group_style, stretch=1)
         splitter.addWidget(right_widget)
-        
-        splitter.setSizes([350, 480, 450])
-        
+
+        splitter.setSizes([480, 350, 450])
+
         # 3. 下部: 背景画像とBGMのタイムライン設定タブ
         bottom_tabs = QTabWidget()
         bottom_tabs.setMaximumHeight(320)
         main_layout.addWidget(bottom_tabs)
-        
+
         # 背景画像タブ
         bg_widget = QWidget()
         bg_layout = QVBoxLayout(bg_widget)
         bg_layout.setContentsMargins(5, 5, 5, 5)
-        
+
         bg_btn_bar = QHBoxLayout()
         bg_layout.addLayout(bg_btn_bar)
         btn_add_bg = QPushButton("➕ 画像追加")
@@ -516,24 +553,26 @@ class ReadingVideoApp(QMainWindow):
         btn_del_bg.clicked.connect(self.remove_selected_bg)
         bg_btn_bar.addWidget(btn_del_bg)
         bg_btn_bar.addStretch()
-        
+
         self.bg_table = QTableWidget(0, 5)
         self.bg_table.setHorizontalHeaderLabels(["ID", "ファイル名", "開始クリップ", "終了クリップ", "有効"])
-        self.bg_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.bg_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.bg_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.bg_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        # 列幅を少し狭くすっきりさせる
-        self.bg_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.bg_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.bg_table.setColumnWidth(0, 40)   # ID
+        self.bg_table.setColumnWidth(1, 300)  # ファイル名
+        self.bg_table.setColumnWidth(2, 100)   # 開始クリップ
+        self.bg_table.setColumnWidth(3, 100)   # 終了クリップ
+        self.bg_table.setColumnWidth(4, 60)   # 有効
         bg_layout.addWidget(self.bg_table)
-        
+
         bottom_tabs.addTab(bg_widget, "背景画像")
-        
+
         # BGMタブ
         bgm_widget = QWidget()
         bgm_layout = QVBoxLayout(bgm_widget)
         bgm_layout.setContentsMargins(5, 5, 5, 5)
-        
+
         bgm_btn_bar = QHBoxLayout()
         bgm_layout.addLayout(bgm_btn_bar)
         btn_add_bgm = QPushButton("➕ BGM追加")
@@ -543,26 +582,29 @@ class ReadingVideoApp(QMainWindow):
         btn_del_bgm.clicked.connect(self.remove_selected_bgm)
         bgm_btn_bar.addWidget(btn_del_bgm)
         bgm_btn_bar.addStretch()
-        
+
         self.bgm_table = QTableWidget(0, 9)
         self.bgm_table.setHorizontalHeaderLabels(["ID", "ファイル名", "開始クリップ", "終了クリップ", "音量", "フェードイン", "フェードアウト", "ループ", "有効"])
-        self.bgm_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.bgm_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.bgm_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.bgm_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.bgm_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.bgm_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.bgm_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        self.bgm_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
-        self.bgm_table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
-        self.bgm_table.horizontalHeader().setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)
+        self.bgm_table.setColumnWidth(0, 40)   # ID
+        self.bgm_table.setColumnWidth(1, 250)  # ファイル名
+        self.bgm_table.setColumnWidth(2, 85)   # 開始クリップ
+        self.bgm_table.setColumnWidth(3, 85)   # 終了クリップ
+        self.bgm_table.setColumnWidth(4, 200)  # 音量
+        self.bgm_table.setColumnWidth(5, 150)   # フェードイン
+        self.bgm_table.setColumnWidth(6, 150)   # フェードアウト
+        self.bgm_table.setColumnWidth(7, 60)   # ループ
+        self.bgm_table.setColumnWidth(8, 60)   # 有効
         bgm_layout.addWidget(self.bgm_table)
-        
+
         bottom_tabs.addTab(bgm_widget, "BGM / 環境音")
-        
+
         # 4. 最下部: ログエリアと書き出しコントロール
         footer_layout = QHBoxLayout()
         main_layout.addLayout(footer_layout)
-        
+
         log_group = QGroupBox(" 実行ログ ")
         log_group_layout = QVBoxLayout(log_group)
         self.log_area = QTextEdit()
@@ -570,12 +612,12 @@ class ReadingVideoApp(QMainWindow):
         self.log_area.setMaximumHeight(120)
         log_group_layout.addWidget(self.log_area)
         footer_layout.addWidget(log_group, stretch=2)
-        
+
         export_widget = QWidget()
         export_widget.setMaximumHeight(135)
         export_layout = QVBoxLayout(export_widget)
         export_layout.setContentsMargins(0, 10, 0, 0)
-        
+
         out_path_layout = QHBoxLayout()
         export_layout.addLayout(out_path_layout)
         out_path_layout.addWidget(QLabel("出力ファイル名:"))
@@ -585,13 +627,22 @@ class ReadingVideoApp(QMainWindow):
         btn_browse_out = QPushButton("参照...")
         btn_browse_out.clicked.connect(self.browse_output_path)
         out_path_layout.addWidget(btn_browse_out)
-        
+
+        gen_row = QHBoxLayout()
+        export_layout.addLayout(gen_row)
+
         self.gen_btn = QPushButton("🎬 動画生成を開始")
         self.gen_btn.setObjectName("action_btn")
         self.gen_btn.setFixedHeight(50)
         self.gen_btn.clicked.connect(self.start_generation)
-        export_layout.addWidget(self.gen_btn)
-        
+        gen_row.addWidget(self.gen_btn, stretch=2)
+
+        self.open_folder_btn = QPushButton("📁 保存先を開く")
+        self.open_folder_btn.setFixedHeight(50)
+        self.open_folder_btn.setEnabled(False)
+        self.open_folder_btn.clicked.connect(self.open_output_folder)
+        gen_row.addWidget(self.open_folder_btn, stretch=1)
+
         footer_layout.addWidget(export_widget, stretch=1)
 
     # ------------------
@@ -600,15 +651,15 @@ class ReadingVideoApp(QMainWindow):
     def renumber_clips(self):
         if not self.project:
             return
-            
+
         old_to_new = {}
         for idx, clip in enumerate(self.project.audio_clips):
             new_id = f"clip_{idx+1:04d}"
             old_to_new[clip.id] = new_id
             clip.id = new_id
-            
+
         clip_ids = [c.id for c in self.project.audio_clips]
-        
+
         for bg in self.project.backgrounds:
             bg.start_clip_id = old_to_new.get(bg.start_clip_id, bg.start_clip_id)
             bg.end_clip_id = old_to_new.get(bg.end_clip_id, bg.end_clip_id)
@@ -616,7 +667,7 @@ class ReadingVideoApp(QMainWindow):
                 bg.start_clip_id = clip_ids[0]
             if bg.end_clip_id not in clip_ids and clip_ids:
                 bg.end_clip_id = clip_ids[-1]
-                
+
         for bgm in self.project.bgm_tracks:
             bgm.start_clip_id = old_to_new.get(bgm.start_clip_id, bgm.start_clip_id)
             bgm.end_clip_id = old_to_new.get(bgm.end_clip_id, bgm.end_clip_id)
@@ -624,36 +675,36 @@ class ReadingVideoApp(QMainWindow):
                 bgm.start_clip_id = clip_ids[0]
             if bgm.end_clip_id not in clip_ids and clip_ids:
                 bgm.end_clip_id = clip_ids[-1]
-                
+
         self.project.save()
 
     def refresh_clip_list(self):
         self.clip_list.blockSignals(True)
         self.clip_list.clear()
-        
+
         if self.project:
             timeline = renderer.VideoTimeline(self.project)
             for idx, clip in enumerate(self.project.audio_clips):
                 item = QListWidgetItem()
                 item.setData(Qt.ItemDataRole.UserRole, clip.id)
-                
+
                 # 長さの特定
                 clip_entry = next((t for t in timeline.clips_timeline if t["clip"].id == clip.id), None)
                 dur = clip_entry["duration"] if clip_entry else 0.0
-                
+
                 # カスタムウィジェットの生成
                 row_widget = ClipRowWidget(idx + 1, clip.display_name, dur, clip.enabled)
                 item.setSizeHint(row_widget.sizeHint())
-                
+
                 self.clip_list.addItem(item)
                 self.clip_list.setItemWidget(item, row_widget)
-                
+
         self.clip_list.blockSignals(False)
 
     def on_clips_reordered(self):
         if not self.project:
             return
-            
+
         new_clips = []
         for i in range(self.clip_list.count()):
             item = self.clip_list.item(i)
@@ -661,15 +712,15 @@ class ReadingVideoApp(QMainWindow):
             clip = next((c for c in self.project.audio_clips if c.id == clip_id), None)
             if clip:
                 new_clips.append(clip)
-                
+
         self.project.audio_clips = new_clips
         self.renumber_clips()
-        
+
         self.refresh_clip_list()
         self.refresh_bg_table()
         self.refresh_bgm_table()
         self.update_preview()
-        
+
         if self.selected_clip_id:
             for i in range(self.clip_list.count()):
                 if self.clip_list.item(i).data(Qt.ItemDataRole.UserRole) == self.selected_clip_id:
@@ -682,29 +733,32 @@ class ReadingVideoApp(QMainWindow):
             self.selected_clip_id = None
             self.update_preview()
             return
-            
+
         clip_id = items[0].data(Qt.ItemDataRole.UserRole)
         self.selected_clip_id = clip_id
-        
+
         clip = next((c for c in self.project.audio_clips if c.id == clip_id), None)
         if clip:
             self.subtitle_text.blockSignals(True)
             self.subtitle_text.setText(clip.subtitle)
             self.subtitle_text.blockSignals(False)
-            
+
             self.clip_vol_scale.blockSignals(True)
             self.clip_vol_scale.setValue(int(clip.volume * 100))
-            self.lbl_clip_vol_val.setText(f"{clip.volume:.2f}")
             self.clip_vol_scale.blockSignals(False)
-            
+
+            self.clip_vol_spin.blockSignals(True)
+            self.clip_vol_spin.setValue(clip.volume)
+            self.clip_vol_spin.blockSignals(False)
+
             self.clip_gap_spin.blockSignals(True)
             self.clip_gap_spin.setValue(clip.gap_after)
             self.clip_gap_spin.blockSignals(False)
-            
+
             self.clip_enabled_chk.blockSignals(True)
             self.clip_enabled_chk.setChecked(clip.enabled)
             self.clip_enabled_chk.blockSignals(False)
-            
+
         self.update_preview()
 
     def on_clip_double_clicked(self, item):
@@ -726,7 +780,20 @@ class ReadingVideoApp(QMainWindow):
         if clip:
             vol = val / 100.0
             clip.volume = vol
-            self.lbl_clip_vol_val.setText(f"{vol:.2f}")
+            self.clip_vol_spin.blockSignals(True)
+            self.clip_vol_spin.setValue(vol)
+            self.clip_vol_spin.blockSignals(False)
+            self.refresh_clip_list()
+
+    def on_clip_vol_spin_changed(self, val):
+        if not self.project or not self.selected_clip_id:
+            return
+        clip = next((c for c in self.project.audio_clips if c.id == self.selected_clip_id), None)
+        if clip:
+            clip.volume = val
+            self.clip_vol_scale.blockSignals(True)
+            self.clip_vol_scale.setValue(int(val * 100))
+            self.clip_vol_scale.blockSignals(False)
             self.refresh_clip_list()
 
     def on_clip_gap_changed(self, val):
@@ -757,7 +824,7 @@ class ReadingVideoApp(QMainWindow):
     def on_style_changed(self):
         if not self.project:
             return
-            
+
         style = self.project.subtitle_style
         style.font_size = self.font_size_spin.value()
         style.position = self.pos_combo.currentText()
@@ -765,7 +832,7 @@ class ReadingVideoApp(QMainWindow):
         style.box_color = self.box_color_ent.text()
         style.box_opacity = self.box_opacity_spin.value()
         style.margin_bottom = self.margin_spin.value()
-        
+
         self.update_preview()
 
     def on_output_changed(self, text):
@@ -778,29 +845,29 @@ class ReadingVideoApp(QMainWindow):
     def refresh_bg_table(self):
         self.bg_table.blockSignals(True)
         self.bg_table.setRowCount(0)
-        
+
         if not self.project:
             self.bg_table.blockSignals(False)
             return
-            
+
         # 番号選択用のリスト [1, 2, 3...]
         nums = [str(i + 1) for i in range(len(self.project.audio_clips))]
-        
+
         for idx, bg in enumerate(self.project.backgrounds):
             row = self.bg_table.rowCount()
             self.bg_table.insertRow(row)
-            
+
             # 1. 番号 (ID)
             num_item = QTableWidgetItem(str(idx + 1))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             num_item.setFlags(num_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.bg_table.setItem(row, 0, num_item)
-            
+
             # 2. ファイル名
             file_item = QTableWidgetItem(os.path.basename(bg.file_path))
             file_item.setFlags(file_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.bg_table.setItem(row, 1, file_item)
-            
+
             # 3. 開始クリップ (QComboBox)
             combo_start = QComboBox()
             combo_start.addItems(nums)
@@ -811,7 +878,7 @@ class ReadingVideoApp(QMainWindow):
                 lambda val, bg_set=bg: self.on_bg_start_changed(bg_set, val)
             )
             self.bg_table.setCellWidget(row, 2, combo_start)
-            
+
             # 4. 終了クリップ (QComboBox)
             combo_end = QComboBox()
             combo_end.addItems(nums)
@@ -821,7 +888,7 @@ class ReadingVideoApp(QMainWindow):
                 lambda val, bg_set=bg: self.on_bg_end_changed(bg_set, val)
             )
             self.bg_table.setCellWidget(row, 3, combo_end)
-            
+
             # 5. 有効 (QCheckBox)
             chk = QCheckBox()
             chk.setChecked(bg.enabled)
@@ -831,12 +898,12 @@ class ReadingVideoApp(QMainWindow):
             chk_lay.addWidget(chk)
             chk_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
             chk_lay.setContentsMargins(0, 0, 0, 0)
-            
+
             chk.stateChanged.connect(
                 lambda state, bg_set=bg: self.on_bg_enabled_changed(bg_set, state)
             )
             self.bg_table.setCellWidget(row, 4, chk_widget)
-            
+
         self.bg_table.blockSignals(False)
 
     def clip_id_to_num_str(self, clip_id):
@@ -870,28 +937,28 @@ class ReadingVideoApp(QMainWindow):
     def refresh_bgm_table(self):
         self.bgm_table.blockSignals(True)
         self.bgm_table.setRowCount(0)
-        
+
         if not self.project:
             self.bgm_table.blockSignals(False)
             return
-            
+
         nums = [str(i + 1) for i in range(len(self.project.audio_clips))]
-        
+
         for idx, bgm in enumerate(self.project.bgm_tracks):
             row = self.bgm_table.rowCount()
             self.bgm_table.insertRow(row)
-            
+
             # 1. 番号 (ID)
             num_item = QTableWidgetItem(str(idx + 1))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             num_item.setFlags(num_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.bgm_table.setItem(row, 0, num_item)
-            
+
             # 2. ファイル名
             file_item = QTableWidgetItem(os.path.basename(bgm.file_path))
             file_item.setFlags(file_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.bgm_table.setItem(row, 1, file_item)
-            
+
             # 3. 開始クリップ
             combo_start = QComboBox()
             combo_start.addItems(nums)
@@ -900,7 +967,7 @@ class ReadingVideoApp(QMainWindow):
                 lambda val, bgm_set=bgm: self.on_bgm_start_changed(bgm_set, val)
             )
             self.bgm_table.setCellWidget(row, 2, combo_start)
-            
+
             # 4. 終了クリップ
             combo_end = QComboBox()
             combo_end.addItems(nums)
@@ -909,14 +976,14 @@ class ReadingVideoApp(QMainWindow):
                 lambda val, bgm_set=bgm: self.on_bgm_end_changed(bgm_set, val)
             )
             self.bgm_table.setCellWidget(row, 3, combo_end)
-            
+
             # 5. 音量 (BVolumeWidget)
             vol_widget = BVolumeWidget(bgm.volume)
             vol_widget.valueChanged.connect(
                 lambda val, bgm_set=bgm: self.on_bgm_volume_changed(bgm_set, val)
             )
             self.bgm_table.setCellWidget(row, 4, vol_widget)
-            
+
             # 6. フェードイン (QDoubleSpinBox + s)
             spin_in = QDoubleSpinBox()
             spin_in.setRange(0.0, 10.0)
@@ -927,7 +994,7 @@ class ReadingVideoApp(QMainWindow):
                 lambda val, bgm_set=bgm: self.on_bgm_fade_in_changed(bgm_set, val)
             )
             self.bgm_table.setCellWidget(row, 5, spin_in)
-            
+
             # 7. フェードアウト (QDoubleSpinBox + s)
             spin_out = QDoubleSpinBox()
             spin_out.setRange(0.0, 10.0)
@@ -938,7 +1005,7 @@ class ReadingVideoApp(QMainWindow):
                 lambda val, bgm_set=bgm: self.on_bgm_fade_out_changed(bgm_set, val)
             )
             self.bgm_table.setCellWidget(row, 6, spin_out)
-            
+
             # 8. ループ
             chk_loop = QCheckBox()
             chk_loop.setChecked(bgm.loop)
@@ -951,7 +1018,7 @@ class ReadingVideoApp(QMainWindow):
                 lambda state, bgm_set=bgm: self.on_bgm_loop_changed(bgm_set, state)
             )
             self.bgm_table.setCellWidget(row, 7, chk_loop_widget)
-            
+
             # 9. 有効
             chk_enabled = QCheckBox()
             chk_enabled.setChecked(bgm.enabled)
@@ -964,7 +1031,7 @@ class ReadingVideoApp(QMainWindow):
                 lambda state, bgm_set=bgm: self.on_bgm_enabled_changed(bgm_set, state)
             )
             self.bgm_table.setCellWidget(row, 8, chk_enabled_widget)
-            
+
         self.bgm_table.blockSignals(False)
 
     def on_bgm_start_changed(self, bgm, val):
@@ -1081,10 +1148,14 @@ class ReadingVideoApp(QMainWindow):
         if not self.project:
             self.project_label.setText("プロジェクト: 未設定")
             return
-            
+
         self.project_label.setText(f"フォルダ: {os.path.basename(self.project.project_dir)}")
         self.output_ent.setText(self.project.output_path)
-        
+
+        # 保存先フォルダ開くボタンの活性状態をチェック
+        out_file = self.project.get_output_abspath()
+        self.open_folder_btn.setEnabled(os.path.exists(out_file))
+
         # 字幕スタイル
         style = self.project.subtitle_style
         self.font_size_spin.setValue(style.font_size)
@@ -1093,14 +1164,14 @@ class ReadingVideoApp(QMainWindow):
         self.box_color_ent.setText(style.box_color)
         self.box_opacity_spin.setValue(style.box_opacity)
         self.margin_spin.setValue(style.margin_bottom)
-        
+
         # 基本待ち時間
         self.default_gap_spin.blockSignals(True)
         # core.Projectにdefault_intervalフィールドが無い場合を考慮
         val = getattr(self.project, "default_interval", 0.5)
         self.default_gap_spin.setValue(val)
         self.default_gap_spin.blockSignals(False)
-        
+
         self.refresh_clip_list()
         self.refresh_bg_table()
         self.refresh_bgm_table()
@@ -1116,7 +1187,7 @@ class ReadingVideoApp(QMainWindow):
             self.preview_widget.set_pixmap(QPixmap())
             self.preview_widget.set_text("クリップが選択されていません")
             return
-            
+
         try:
             preview_img = renderer.generate_preview_image(self.project, self.selected_clip_id)
             pix = pil_to_qpixmap(preview_img)
@@ -1135,47 +1206,64 @@ class ReadingVideoApp(QMainWindow):
             return
         if self.is_generating:
             return
-            
+
         enabled_clips = [c for c in self.project.audio_clips if c.enabled]
         if not enabled_clips:
             QMessageBox.critical(self, "エラー", "有効な音声クリップがありません。")
             return
-            
+
         if not self.project.backgrounds:
             QMessageBox.critical(self, "エラー", "背景画像が登録されていません。")
             return
-            
+
         self.is_generating = True
         self.gen_btn.setEnabled(False)
         self.gen_btn.setText("⏳ 動画生成中...")
+        self.open_folder_btn.setEnabled(False)
         self.log_area.clear()
-        
+
         # default_intervalがProjectモデルにセットされていることを確認
         self.project.default_interval = self.default_gap_spin.value()
         self.project.save()
-        
+
         self.thread = QThread()
         self.worker = RenderWorker(self.project)
         self.worker.moveToThread(self.thread)
-        
+
         self.thread.started.connect(self.worker.run)
         self.worker.log_signal.connect(self.log_write)
         self.worker.finished_signal.connect(self.on_generation_finished)
-        
+
         self.thread.start()
 
     def on_generation_finished(self, success, result_msg):
         self.thread.quit()
         self.thread.wait()
-        
+
         self.is_generating = False
         self.gen_btn.setEnabled(True)
         self.gen_btn.setText("🎬 動画生成を開始")
-        
+
         if success:
+            self.open_folder_btn.setEnabled(True)
             QMessageBox.information(self, "完了", f"動画生成が完了しました！\n出力先: {result_msg}")
         else:
+            self.open_folder_btn.setEnabled(os.path.exists(self.project.get_output_abspath()))
             QMessageBox.critical(self, "エラー", f"動画生成に失敗しました:\n{result_msg}")
+
+    def open_output_folder(self):
+        if not self.project:
+            return
+        out_file = self.project.get_output_abspath()
+        if os.path.exists(out_file):
+            import subprocess
+            subprocess.run(["explorer", "/select,", os.path.normpath(out_file)])
+        else:
+            parent_dir = os.path.dirname(out_file)
+            if os.path.exists(parent_dir):
+                os.startfile(parent_dir)
+            else:
+                QMessageBox.warning(self, "警告", "出力先フォルダが見つかりません。")
 
     def closeEvent(self, event):
         if self.thread and self.thread.isRunning():

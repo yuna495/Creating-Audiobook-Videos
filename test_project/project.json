@@ -31,7 +31,7 @@
       "id": "clip_0003",
       "file_path": "audio/clip_0003.wav",
       "display_name": "003_暁記ミタマ（ノーマル）_風が頬を撫でた。.wav",
-      "subtitle": "風が",
+      "subtitle": "風が頬を撫でた。",
       "gap_after": 0.5,
       "volume": 1.0,
       "enabled": true
@@ -60,7 +60,7 @@
       "id": "bg_0001",
       "file_path": "images/bg_0001.png",
       "start_clip_id": "clip_0001",
-      "end_clip_id": "clip_0005",
+      "end_clip_id": "clip_0002",
       "enabled": true,
       "transition": {
         "type": "fade",
@@ -70,7 +70,7 @@
     {
       "id": "bg_0002",
       "file_path": "images/bg_0002.png",
-      "start_clip_id": "clip_0001",
+      "start_clip_id": "clip_0003",
       "end_clip_id": "clip_0005",
       "enabled": true,
       "transition": {
@@ -83,9 +83,9 @@
     {
       "id": "bgm_0001",
       "file_path": "bgm/bgm_0001.wav",
-      "start_clip_id": "clip_0001",
+      "start_clip_id": "clip_0003",
       "end_clip_id": "clip_0005",
-      "volume": 0.13,
+      "volume": 0.25,
       "fade_in": 1.0,
       "fade_out": 3.0,
       "loop": true,

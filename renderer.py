@@ -204,7 +204,7 @@ def generate_preview_image(project: Project, clip_id: str):
             start_times = timeline.get_clip_times(bg_set.start_clip_id)
             end_times = timeline.get_clip_times(bg_set.end_clip_id)
             if start_times and end_times:
-                if start_times[0] <= start_time <= end_times[2]:
+                if start_times[0] <= start_time < end_times[2]:
                     bg_image_path = os.path.abspath(os.path.join(project.project_dir, bg_set.file_path))
                     break
                     
@@ -308,7 +308,7 @@ def render_movie(project: Project, log_callback=print):
                 start_times = timeline.get_clip_times(bg_set.start_clip_id)
                 end_times = timeline.get_clip_times(bg_set.end_clip_id)
                 if start_times and end_times:
-                    if start_times[0] <= t <= end_times[2]:
+                    if start_times[0] <= t < end_times[2]:
                         active_bg_set = bg_set
                         break
         return active_bg_set
