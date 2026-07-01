@@ -73,22 +73,44 @@ class PreviewWidget(QWidget):
         painter.setPen(Qt.GlobalColor.darkGray)
         painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
 
+class ElidedLabel(QLabel):
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.full_text = text
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.setMinimumWidth(10)
+
+    def setText(self, text):
+        self.full_text = text
+        super().setText(text)
+        self.update_elided_text()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_elided_text()
+
+    def update_elided_text(self):
+        fm = self.fontMetrics()
+        # 左右の少しのバッファを考慮
+        elided = fm.elidedText(self.full_text, Qt.TextElideMode.ElideRight, max(0, self.width() - 4))
+        super().setText(elided)
+
 class ClipRowWidget(QWidget):
-    def __init__(self, index, name, duration, enabled=True, parent=None):
+    def __init__(self, index, name, duration, gap_after, enabled=True, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setStyleSheet("background: transparent;")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(5, 2, 5, 2)
-        layout.setSpacing(10)
+        layout.setContentsMargins(5, 2, 2, 2)
+        layout.setSpacing(2)
 
         self.lbl_idx = QLabel(f"[{index}]")
-        self.lbl_idx.setFixedWidth(45)
+        self.lbl_idx.setFixedWidth(35)
         self.lbl_idx.setStyleSheet("font-weight: bold; color: #88ff88; background: transparent;")
         layout.addWidget(self.lbl_idx)
 
-        self.lbl_name = QLabel(name)
+        self.lbl_name = ElidedLabel(name)
         if not enabled:
             self.lbl_name.setStyleSheet("text-decoration: line-through; color: #666666; background: transparent;")
         else:
@@ -96,10 +118,16 @@ class ClipRowWidget(QWidget):
         layout.addWidget(self.lbl_name, stretch=1)
 
         self.lbl_dur = QLabel(f"{duration:.2f}s")
-        self.lbl_dur.setFixedWidth(60)
-        self.lbl_dur.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.lbl_dur.setFixedWidth(45)
+        self.lbl_dur.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_dur.setStyleSheet("color: #a0a0a0; background: transparent;")
         layout.addWidget(self.lbl_dur)
+
+        self.lbl_gap = QLabel(f"(+{gap_after:.2f}s)")
+        self.lbl_gap.setFixedWidth(48)
+        self.lbl_gap.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.lbl_gap.setStyleSheet("color: #77aaff; background: transparent;")
+        layout.addWidget(self.lbl_gap)
 
 class BVolumeWidget(QWidget):
     valueChanged = Signal(float)
@@ -140,7 +168,7 @@ class BVolumeWidget(QWidget):
 
 class AppConfig:
     def __init__(self):
-        self.config_path = os.path.abspath(os.path.join(os.getcwd(), "app_config.json"))
+        self.config_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_config.json"))
         self.default_interval = 0.5
         self.font_family = "Yu Mincho"
         self.font_size = 58
@@ -150,6 +178,12 @@ class AppConfig:
         self.box_opacity = 0.5
         self.margin_bottom = 95
         self.direction = "horizontal"
+        self.margin_top = 95
+        self.margin_right = 95
+        self.align = "center"
+        self.margin_left = 95
+        self.default_project_dir = ""
+        self.default_asset_dir = ""
         self.load()
 
     def load(self):
@@ -159,6 +193,8 @@ class AppConfig:
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self.default_interval = data.get("default_interval", 0.5)
+                self.default_project_dir = data.get("default_project_dir", "")
+                self.default_asset_dir = data.get("default_asset_dir", "")
                 style = data.get("subtitle_style", {})
                 self.font_family = style.get("font_family", "Yu Mincho")
                 self.font_size = style.get("font_size", 58)
@@ -168,6 +204,10 @@ class AppConfig:
                 self.box_opacity = style.get("box_opacity", 0.5)
                 self.margin_bottom = style.get("margin_bottom", 95)
                 self.direction = style.get("direction", "horizontal")
+                self.margin_top = style.get("margin_top", 95)
+                self.margin_right = style.get("margin_right", 95)
+                self.align = style.get("align", "center")
+                self.margin_left = style.get("margin_left", 95)
             except Exception:
                 pass
 
@@ -175,6 +215,8 @@ class AppConfig:
         import json
         data = {
             "default_interval": self.default_interval,
+            "default_project_dir": self.default_project_dir,
+            "default_asset_dir": self.default_asset_dir,
             "subtitle_style": {
                 "font_family": self.font_family,
                 "font_size": self.font_size,
@@ -183,7 +225,11 @@ class AppConfig:
                 "box_color": self.box_color,
                 "box_opacity": self.box_opacity,
                 "margin_bottom": self.margin_bottom,
-                "direction": self.direction
+                "direction": self.direction,
+                "margin_top": self.margin_top,
+                "margin_right": self.margin_right,
+                "align": self.align,
+                "margin_left": self.margin_left
             }
         }
         try:
@@ -198,7 +244,7 @@ class ConfigDialog(QDialog):
         self.app_config = app_config
         self.project = project
         self.setWindowTitle("アプリ・プロジェクト設定")
-        self.resize(500, 560)
+        self.resize(500, 760)
 
         # システムフォント一覧の取得
         self.system_fonts = []
@@ -241,6 +287,8 @@ class ConfigDialog(QDialog):
         self.buttons.accepted.connect(self.accept_and_save)
         self.buttons.rejected.connect(self.reject)
         layout.addWidget(self.buttons)
+
+        self.update_margin_fields_enabled()
 
         # プロジェクトが無い場合はプロジェクトタブを非活性に (インデックス0)
         if not self.project:
@@ -296,17 +344,63 @@ class ConfigDialog(QDialog):
         self.app_box_opacity.setValue(self.app_config.box_opacity)
         form.addWidget(self.app_box_opacity, 6, 1)
 
-        form.addWidget(QLabel("下マージン:"), 7, 0)
+        form.addWidget(QLabel("下マージン (横書き用):"), 9, 0)
         self.app_margin = QSpinBox()
         self.app_margin.setRange(0, 500)
         self.app_margin.setValue(self.app_config.margin_bottom)
-        form.addWidget(self.app_margin, 7, 1)
+        form.addWidget(self.app_margin, 9, 1)
 
-        form.addWidget(QLabel("字幕書字方向:"), 8, 0)
+        form.addWidget(QLabel("字幕書字方向:"), 7, 0)
         self.app_direction_combo = QComboBox()
         self.app_direction_combo.addItems(["横書き", "縦書き"])
         self.app_direction_combo.setCurrentText("縦書き" if self.app_config.direction == "vertical" else "横書き")
-        form.addWidget(self.app_direction_combo, 8, 1)
+        form.addWidget(self.app_direction_combo, 7, 1)
+        self.app_direction_combo.currentIndexChanged.connect(self.update_margin_fields_enabled)
+
+        form.addWidget(QLabel("上マージン (縦書き用):"), 11, 0)
+        self.app_margin_top = QSpinBox()
+        self.app_margin_top.setRange(0, 500)
+        self.app_margin_top.setValue(self.app_config.margin_top)
+        form.addWidget(self.app_margin_top, 11, 1)
+
+        form.addWidget(QLabel("右マージン (縦書き用):"), 12, 0)
+        self.app_margin_right = QSpinBox()
+        self.app_margin_right.setRange(0, 500)
+        self.app_margin_right.setValue(self.app_config.margin_right)
+        form.addWidget(self.app_margin_right, 12, 1)
+
+        form.addWidget(QLabel("左マージン (横書き左揃え用):"), 10, 0)
+        self.app_margin_left = QSpinBox()
+        self.app_margin_left.setRange(0, 500)
+        self.app_margin_left.setValue(self.app_config.margin_left)
+        form.addWidget(self.app_margin_left, 10, 1)
+
+        form.addWidget(QLabel("横書きテキストボックス配置モード:"), 8, 0)
+        self.app_align_combo = QComboBox()
+        self.app_align_combo.addItems(["中央揃え", "フリー配置"])
+        self.app_align_combo.setCurrentText("フリー配置" if self.app_config.align == "left" else "中央揃え")
+        form.addWidget(self.app_align_combo, 8, 1)
+        self.app_align_combo.currentIndexChanged.connect(self.update_margin_fields_enabled)
+
+        # プロジェクト初期フォルダ
+        form.addWidget(QLabel("プロジェクト初期フォルダ:"), 13, 0)
+        proj_dir_lay = QHBoxLayout()
+        self.app_proj_dir_edit = QLineEdit(self.app_config.default_project_dir)
+        proj_dir_lay.addWidget(self.app_proj_dir_edit, stretch=1)
+        btn_browse_proj = QPushButton("参照...")
+        btn_browse_proj.clicked.connect(self.browse_default_proj_dir)
+        proj_dir_lay.addWidget(btn_browse_proj)
+        form.addLayout(proj_dir_lay, 13, 1)
+
+        # 素材参照初期フォルダ
+        form.addWidget(QLabel("素材参照初期フォルダ:"), 14, 0)
+        asset_dir_lay = QHBoxLayout()
+        self.app_asset_dir_edit = QLineEdit(self.app_config.default_asset_dir)
+        asset_dir_lay.addWidget(self.app_asset_dir_edit, stretch=1)
+        btn_browse_asset = QPushButton("参照...")
+        btn_browse_asset.clicked.connect(self.browse_default_asset_dir)
+        asset_dir_lay.addWidget(btn_browse_asset)
+        form.addLayout(asset_dir_lay, 14, 1)
 
         lay.addStretch()
 
@@ -355,15 +449,39 @@ class ConfigDialog(QDialog):
         self.proj_box_opacity.setSingleStep(0.1)
         self.proj_form.addWidget(self.proj_box_opacity, 6, 1)
 
-        self.proj_form.addWidget(QLabel("下マージン:"), 7, 0)
-        self.proj_margin = QSpinBox()
-        self.proj_margin.setRange(0, 500)
-        self.proj_form.addWidget(self.proj_margin, 7, 1)
-
-        self.proj_form.addWidget(QLabel("字幕書字方向:"), 8, 0)
+        self.proj_form.addWidget(QLabel("字幕書字方向:"), 7, 0)
         self.proj_direction_combo = QComboBox()
         self.proj_direction_combo.addItems(["横書き", "縦書き"])
-        self.proj_form.addWidget(self.proj_direction_combo, 8, 1)
+        self.proj_form.addWidget(self.proj_direction_combo, 7, 1)
+        self.proj_direction_combo.currentIndexChanged.connect(self.update_margin_fields_enabled)
+
+        self.proj_form.addWidget(QLabel("横書きテキストボックス配置モード:"), 8, 0)
+        self.proj_align_combo = QComboBox()
+        self.proj_align_combo.addItems(["中央揃え", "フリー配置"])
+        self.proj_form.addWidget(self.proj_align_combo, 8, 1)
+        self.proj_align_combo.currentIndexChanged.connect(self.update_margin_fields_enabled)
+
+        self.proj_form.addWidget(QLabel("下マージン (横書き用):"), 9, 0)
+        self.proj_margin = QSpinBox()
+        self.proj_margin.setRange(0, 500)
+        self.proj_form.addWidget(self.proj_margin, 9, 1)
+
+        self.proj_form.addWidget(QLabel("左マージン (横書き左揃え用):"), 10, 0)
+        self.proj_margin_left = QSpinBox()
+        self.proj_margin_left.setRange(0, 500)
+        self.proj_form.addWidget(self.proj_margin_left, 10, 1)
+
+        self.proj_form.addWidget(QLabel("上マージン (縦書き用):"), 11, 0)
+        self.proj_margin_top = QSpinBox()
+        self.proj_margin_top.setRange(0, 500)
+        self.proj_form.addWidget(self.proj_margin_top, 11, 1)
+
+        self.proj_form.addWidget(QLabel("右マージン (縦書き用):"), 12, 0)
+        self.proj_margin_right = QSpinBox()
+        self.proj_margin_right.setRange(0, 500)
+        self.proj_form.addWidget(self.proj_margin_right, 12, 1)
+
+
 
         lay.addStretch()
 
@@ -385,11 +503,54 @@ class ConfigDialog(QDialog):
             self.proj_box_opacity.setValue(style.box_opacity)
             self.proj_margin.setValue(style.margin_bottom)
             self.proj_direction_combo.setCurrentText("縦書き" if style.direction == "vertical" else "横書き")
+            self.proj_margin_top.setValue(style.margin_top)
+            self.proj_margin_right.setValue(style.margin_right)
+            self.proj_margin_left.setValue(style.margin_left)
+            self.proj_align_combo.setCurrentText("フリー配置" if style.align == "left" else "中央揃え")
 
         self.on_proj_chk_toggled(self.proj_chk.isChecked())
 
+    def update_margin_fields_enabled(self):
+        # アプリタブ
+        if hasattr(self, "app_direction_combo"):
+            app_is_vert = (self.app_direction_combo.currentText() == "縦書き")
+            self.app_margin.setEnabled(not app_is_vert)
+            self.app_margin_top.setEnabled(app_is_vert)
+            self.app_margin_right.setEnabled(app_is_vert)
+            self.app_align_combo.setEnabled(not app_is_vert)
+
+            app_is_left = (self.app_align_combo.currentText() == "フリー配置")
+            self.app_margin_left.setEnabled((not app_is_vert) and app_is_left)
+
+        # プロジェクトタブ
+        if hasattr(self, "proj_direction_combo"):
+            proj_is_vert = (self.proj_direction_combo.currentText() == "縦書き")
+            self.proj_margin.setEnabled(not proj_is_vert)
+            self.proj_margin_top.setEnabled(proj_is_vert)
+            self.proj_margin_right.setEnabled(proj_is_vert)
+            self.proj_align_combo.setEnabled(not proj_is_vert)
+
+            proj_is_left = (self.proj_align_combo.currentText() == "フリー配置")
+            self.proj_margin_left.setEnabled((not proj_is_vert) and proj_is_left)
+
     def on_proj_chk_toggled(self, checked):
         self.proj_form_widget.setEnabled(checked)
+        if checked:
+            self.update_margin_fields_enabled()
+
+    def browse_default_proj_dir(self):
+        curr = self.app_proj_dir_edit.text().strip()
+        start = curr if curr and os.path.exists(curr) else os.getcwd()
+        d = QFileDialog.getExistingDirectory(self, "プロジェクト初期フォルダの選択", start)
+        if d:
+            self.app_proj_dir_edit.setText(os.path.abspath(d))
+
+    def browse_default_asset_dir(self):
+        curr = self.app_asset_dir_edit.text().strip()
+        start = curr if curr and os.path.exists(curr) else os.getcwd()
+        d = QFileDialog.getExistingDirectory(self, "素材参照初期フォルダの選択", start)
+        if d:
+            self.app_asset_dir_edit.setText(os.path.abspath(d))
 
     def accept_and_save(self):
         # 1. アプリ設定を保存
@@ -402,6 +563,12 @@ class ConfigDialog(QDialog):
         self.app_config.box_opacity = self.app_box_opacity.value()
         self.app_config.margin_bottom = self.app_margin.value()
         self.app_config.direction = "vertical" if self.app_direction_combo.currentText() == "縦書き" else "horizontal"
+        self.app_config.margin_top = self.app_margin_top.value()
+        self.app_config.margin_right = self.app_margin_right.value()
+        self.app_config.margin_left = self.app_margin_left.value()
+        self.app_config.align = "left" if self.app_align_combo.currentText() == "フリー配置" else "center"
+        self.app_config.default_project_dir = self.app_proj_dir_edit.text().strip()
+        self.app_config.default_asset_dir = self.app_asset_dir_edit.text().strip()
         self.app_config.save()
 
         # 2. プロジェクト個別設定を保存
@@ -418,6 +585,10 @@ class ConfigDialog(QDialog):
                 style.box_opacity = self.proj_box_opacity.value()
                 style.margin_bottom = self.proj_margin.value()
                 style.direction = "vertical" if self.proj_direction_combo.currentText() == "縦書き" else "horizontal"
+                style.margin_top = self.proj_margin_top.value()
+                style.margin_right = self.proj_margin_right.value()
+                style.margin_left = self.proj_margin_left.value()
+                style.align = "left" if self.proj_align_combo.currentText() == "フリー配置" else "center"
             self.project.save()
 
         self.accept()
@@ -818,6 +989,7 @@ class ReadingVideoApp(QMainWindow):
         clip_btn_bar.addStretch()
 
         self.clip_list = DragDropListWidget()
+        self.clip_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.clip_list.order_changed.connect(self.on_clips_reordered)
         self.clip_list.itemSelectionChanged.connect(self.on_clip_selected)
         self.clip_list.itemDoubleClicked.connect(self.on_clip_double_clicked)
@@ -1078,7 +1250,7 @@ class ReadingVideoApp(QMainWindow):
                 dur = clip_entry["duration"] if clip_entry else 0.0
 
                 # カスタムウィジェットの生成
-                row_widget = ClipRowWidget(idx + 1, clip.display_name, dur, clip.enabled)
+                row_widget = ClipRowWidget(idx + 1, clip.display_name, dur, clip.gap_after, clip.enabled)
                 item.setSizeHint(row_widget.sizeHint())
 
                 self.clip_list.addItem(item)
@@ -1170,7 +1342,7 @@ class ReadingVideoApp(QMainWindow):
             return
         clip = next((c for c in self.project.audio_clips if c.id == self.selected_clip_id), None)
         if clip:
-            clip.subtitle = self.subtitle_text.toPlainText().strip()
+            clip.subtitle = self.subtitle_text.toPlainText().rstrip()
             self.subtitle_timer.start() # 1秒後にプレビューを更新
 
     def update_preview_from_timer(self):
@@ -1455,8 +1627,9 @@ class ReadingVideoApp(QMainWindow):
     def add_background(self):
         if not self.project:
             return
+        start_dir = self.app_config.default_asset_dir if self.app_config.default_asset_dir and os.path.exists(self.app_config.default_asset_dir) else ""
         files, _ = QFileDialog.getOpenFileNames(
-            self, "背景画像を追加", "",
+            self, "背景画像を追加", start_dir,
             "Image Files (*.png *.jpg *.jpeg *.webp)"
         )
         if files:
@@ -1481,8 +1654,9 @@ class ReadingVideoApp(QMainWindow):
     def add_bgm(self):
         if not self.project:
             return
+        start_dir = self.app_config.default_asset_dir if self.app_config.default_asset_dir and os.path.exists(self.app_config.default_asset_dir) else ""
         files, _ = QFileDialog.getOpenFileNames(
-            self, "BGMアセットを追加", "",
+            self, "BGMアセットを追加", start_dir,
             "Audio Files (*.wav *.mp3 *.m4a *.aac *.ogg *.flac)"
         )
         if files:
@@ -1504,8 +1678,9 @@ class ReadingVideoApp(QMainWindow):
     def add_audio_clips(self):
         if not self.project:
             return
+        start_dir = self.app_config.default_asset_dir if self.app_config.default_asset_dir and os.path.exists(self.app_config.default_asset_dir) else ""
         files, _ = QFileDialog.getOpenFileNames(
-            self, "音声アセットを追加", "",
+            self, "音声アセットを追加", start_dir,
             "Audio Files (*.wav *.mp3 *.m4a *.aac *.ogg *.flac)"
         )
         if files:
@@ -1596,6 +1771,10 @@ class ReadingVideoApp(QMainWindow):
             style.max_width,
             style.line_spacing,
             style.direction,
+            style.margin_top,
+            style.margin_right,
+            style.align,
+            style.margin_left,
         )
 
     def preview_background_key(self):
@@ -1716,6 +1895,10 @@ class ReadingVideoApp(QMainWindow):
             style.box_opacity = self.app_config.box_opacity
             style.margin_bottom = self.app_config.margin_bottom
             style.direction = self.app_config.direction
+            style.margin_top = self.app_config.margin_top
+            style.margin_right = self.app_config.margin_right
+            style.align = self.app_config.align
+            style.margin_left = self.app_config.margin_left
             self.project.save()
 
     # ------------------
@@ -1832,7 +2015,8 @@ class ReadingVideoApp(QMainWindow):
         event.accept()
 
     def new_project(self):
-        path = QFileDialog.getExistingDirectory(self, "新規プロジェクトの保存先フォルダを選択")
+        start_dir = self.app_config.default_project_dir if self.app_config.default_project_dir and os.path.exists(self.app_config.default_project_dir) else ""
+        path = QFileDialog.getExistingDirectory(self, "新規プロジェクトの保存先フォルダを選択", start_dir)
         if path:
             self.project = core.Project(path)
             self.project.save()
@@ -1842,7 +2026,8 @@ class ReadingVideoApp(QMainWindow):
             self.log_write(f"新規プロジェクトを作成しました: {path}")
 
     def open_project(self):
-        path = QFileDialog.getExistingDirectory(self, "プロジェクトフォルダを選択")
+        start_dir = self.app_config.default_project_dir if self.app_config.default_project_dir and os.path.exists(self.app_config.default_project_dir) else ""
+        path = QFileDialog.getExistingDirectory(self, "プロジェクトフォルダを選択", start_dir)
         if path:
             if not os.path.exists(os.path.join(path, "project.json")):
                 reply = QMessageBox.question(

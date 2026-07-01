@@ -201,7 +201,7 @@ class BgmSetting:
         )
 
 class SubtitleStyle:
-    def __init__(self, font_family="Yu Mincho", font_size=58, text_color="#EEF1F8", shadow_color="#000000", box_color="#000000", box_opacity=0.5, position="bottom", margin_bottom=95, max_width=1500, line_spacing=16, direction="horizontal"):
+    def __init__(self, font_family="Yu Mincho", font_size=58, text_color="#EEF1F8", shadow_color="#000000", box_color="#000000", box_opacity=0.5, position="bottom", margin_bottom=95, max_width=1500, line_spacing=16, direction="horizontal", margin_top=95, margin_right=95, align="center", margin_left=95):
         self.font_family = font_family
         self.font_size = font_size
         self.text_color = text_color
@@ -213,6 +213,10 @@ class SubtitleStyle:
         self.max_width = max_width
         self.line_spacing = line_spacing
         self.direction = direction
+        self.margin_top = margin_top
+        self.margin_right = margin_right
+        self.align = align
+        self.margin_left = margin_left
 
     def to_dict(self):
         return {
@@ -226,7 +230,11 @@ class SubtitleStyle:
             "margin_bottom": self.margin_bottom,
             "max_width": self.max_width,
             "line_spacing": self.line_spacing,
-            "direction": self.direction
+            "direction": self.direction,
+            "margin_top": self.margin_top,
+            "margin_right": self.margin_right,
+            "align": self.align,
+            "margin_left": self.margin_left
         }
 
     @classmethod
@@ -242,7 +250,11 @@ class SubtitleStyle:
             margin_bottom=d.get("margin_bottom", 95),
             max_width=d.get("max_width", 1500),
             line_spacing=d.get("line_spacing", 16),
-            direction=d.get("direction", "horizontal")
+            direction=d.get("direction", "horizontal"),
+            margin_top=d.get("margin_top", 95),
+            margin_right=d.get("margin_right", 95),
+            align=d.get("align", "center"),
+            margin_left=d.get("margin_left", 95)
         )
 
 class Project:

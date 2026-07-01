@@ -229,7 +229,10 @@ def build_subtitle_overlay(text, style, font, width, height):
         padding_x = 35
         padding_y = 35
         
-        max_height = height - style.margin_bottom * 2
+        margin_top = getattr(style, "margin_top", 95)
+        margin_right = getattr(style, "margin_right", 95)
+        
+        max_height = height - margin_top - 95
         if max_height < font.size * 2:
             max_height = height - 100
             
@@ -243,14 +246,12 @@ def build_subtitle_overlay(text, style, font, width, height):
         box_w = text_w + padding_x * 2
         box_h = text_h + padding_y * 2
         
-        box_y = (height - box_h) // 2
+        box_y = margin_top
         
-        if style.position == "top":
-            box_x = width - style.margin_bottom - box_w
-        elif style.position == "center":
+        if style.position == "center":
             box_x = (width - box_w) // 2
-        else: # bottom
-            box_x = width - style.margin_bottom * 2 - box_w
+        else:
+            box_x = width - margin_right - box_w
             
         if box_x < 20:
             box_x = 20
@@ -277,6 +278,8 @@ def build_subtitle_overlay(text, style, font, width, height):
             
             for c_idx, char in enumerate(line):
                 y = line_y + c_idx * font.size
+                if char in (" ", "　", "\u3000"):
+                    continue
                 
                 if char in ROTATED_CHARS:
                     char_size = font.size * 2
@@ -298,17 +301,26 @@ def build_subtitle_overlay(text, style, font, width, height):
                     oy = int(y + font.size * 0.5 - char_size * 0.5)
                     overlay.alpha_composite(rotated, (ox, oy))
                 else:
-                    ox = 0
-                    oy = 0
-                    if char in PUNCTUATION_CHARS:
-                        ox = int(font.size * 0.55)
-                        oy = -int(font.size * 0.35)
-                    elif char in SMALL_CHARS:
-                        ox = int(font.size * 0.12)
-                        oy = -int(font.size * 0.05)
+                    if char in PUNCTUATION_CHARS or char in SMALL_CHARS:
+                        draw_x = line_x
+                        ox = 0
+                        oy = 0
+                        if char in PUNCTUATION_CHARS:
+                            ox = int(font.size * 0.55)
+                            oy = -int(font.size * 0.35)
+                        elif char in SMALL_CHARS:
+                            ox = int(font.size * 0.12)
+                            oy = -int(font.size * 0.05)
+                    else:
+                        c_bbox = draw.textbbox((0, 0), char, font=font)
+                        c_w = c_bbox[2] - c_bbox[0]
+                        center_x = line_x + font.size * 0.5
+                        draw_x = center_x - c_w * 0.5 - c_bbox[0]
+                        ox = 0
+                        oy = 0
                     
-                    draw.text((line_x + ox + 3, y + oy + 3), char, font=font, fill=shadow_color_rgba)
-                    draw.text((line_x + ox, y + oy), char, font=font, fill=text_color_rgba)
+                    draw.text((draw_x + ox + 3, y + oy + 3), char, font=font, fill=shadow_color_rgba)
+                    draw.text((draw_x + ox, y + oy), char, font=font, fill=text_color_rgba)
     else:
         lines = wrap_text_japanese(text, font, style.max_width)
         
@@ -324,7 +336,14 @@ def build_subtitle_overlay(text, style, font, width, height):
         
         box_w = text_w + padding_x * 2
         box_h = text_h + padding_y * 2
-        box_x = (width - box_w) // 2
+        
+        align = getattr(style, "align", "center")
+        margin_left = getattr(style, "margin_left", 95)
+        
+        if align == "left":
+            box_x = margin_left
+        else:
+            box_x = (width - box_w) // 2
         
         if style.position == "top":
             box_y = style.margin_bottom
@@ -345,7 +364,10 @@ def build_subtitle_overlay(text, style, font, width, height):
         for idx, line in enumerate(lines):
             line_w = line_widths[idx]
             line_h = line_heights[idx]
-            x = (width - line_w) // 2
+            if align == "left":
+                x = box_x + padding_x
+            else:
+                x = (width - line_w) // 2
             draw.text((x + 3, y + 3), line, font=font, fill=shadow_color_rgba)
             draw.text((x, y), line, font=font, fill=text_color_rgba)
             y += line_h + style.line_spacing

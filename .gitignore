@@ -9,3 +9,5 @@ venv/
 .DS_Store
 
 notesetting.json
+app_config.json
+test_project/
